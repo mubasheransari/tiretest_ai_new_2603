@@ -8,7 +8,7 @@ import 'package:ios_tiretest_ai/Screens/two_wheeler_report_result_screen.dart';
 
 
 
-enum TwoTyrePos { front, back }
+enum TwoTyrePos { front, frontSidewall, back, backSidewall }
 
 class TwoWheelerGenerateReportScreen extends StatefulWidget {
   final String title;
@@ -29,7 +29,7 @@ class TwoWheelerGenerateReportScreen extends StatefulWidget {
 
   const TwoWheelerGenerateReportScreen({
     super.key,
-    this.title = "Bike Tyre Scanner",
+    this.title = "Bike Tyre Scanner657",
     required this.userId,
     required this.vehicleId,
     required this.token,
@@ -54,7 +54,9 @@ class _TwoWheelerGenerateReportScreenState extends State<TwoWheelerGenerateRepor
   bool _stopping = false;
 
   XFile? _front;
+  XFile? _frontSidewall;
   XFile? _back;
+  XFile? _backSidewall;
 
   TwoTyrePos _active = TwoTyrePos.front;
 
@@ -63,7 +65,11 @@ class _TwoWheelerGenerateReportScreenState extends State<TwoWheelerGenerateRepor
 
   final ImagePicker _picker = ImagePicker();
 
-  bool get _bothCaptured => _front != null && _back != null;
+  bool get _bothCaptured =>
+      _front != null &&
+      _frontSidewall != null &&
+      _back != null &&
+      _backSidewall != null;
 
   @override
   void initState() {
@@ -176,20 +182,30 @@ class _TwoWheelerGenerateReportScreenState extends State<TwoWheelerGenerateRepor
     super.dispose();
   }
 
-  // ✅ Bulletproof assignment:
-  // First image ALWAYS goes to FRONT, second ALWAYS goes to BACK.
   void _setFileForNextSlot(XFile file) {
     setState(() {
       _error = null;
 
       if (_front == null) {
         _front = file;
+        _active = TwoTyrePos.frontSidewall;
+        return;
+      }
+
+      if (_frontSidewall == null) {
+        _frontSidewall = file;
         _active = TwoTyrePos.back;
         return;
       }
 
-      _back = file;
-      _active = TwoTyrePos.back;
+      if (_back == null) {
+        _back = file;
+        _active = TwoTyrePos.backSidewall;
+        return;
+      }
+
+      _backSidewall = file;
+      _active = TwoTyrePos.backSidewall;
     });
   }
 
@@ -244,7 +260,7 @@ class _TwoWheelerGenerateReportScreenState extends State<TwoWheelerGenerateRepor
   
   Future<void> _goGenerateReport() async {
   if (_navigated) return;
-  if (_front == null || _back == null) return;
+  if (_front == null || _frontSidewall == null || _back == null || _backSidewall == null) return;
 
   _navigated = true;
 
@@ -255,7 +271,9 @@ class _TwoWheelerGenerateReportScreenState extends State<TwoWheelerGenerateRepor
     MaterialPageRoute(
       builder: (_) => TwoWheelerReportResultScreen(
         frontPath: _front!.path,
+        frontSidewallPath: _frontSidewall!.path,
         backPath: _back!.path,
+        backSidewallPath: _backSidewall!.path,
         userId: widget.userId,
         vehicleId: widget.vehicleId,
         token: widget.token,
@@ -274,7 +292,9 @@ class _TwoWheelerGenerateReportScreenState extends State<TwoWheelerGenerateRepor
   if (mounted) {
     setState(() {
       _front = null;
+      _frontSidewall = null;
       _back = null;
+      _backSidewall = null;
       _active = TwoTyrePos.front;
       _error = null;
     });
@@ -286,7 +306,7 @@ class _TwoWheelerGenerateReportScreenState extends State<TwoWheelerGenerateRepor
 
 //   Future<void> _goGenerateReport() async {
 //     if (_navigated) return;
-//     if (_front == null || _back == null) return;
+//     if (_front == null || _frontSidewall == null || _back == null || _backSidewall == null) return;
 
 //     _navigated = true;
 
@@ -314,25 +334,31 @@ class _TwoWheelerGenerateReportScreenState extends State<TwoWheelerGenerateRepor
 
   void _retake(TwoTyrePos pos) {
     setState(() {
-      if (pos == TwoTyrePos.front) {
-        _front = null;
-        // If you remove front, back becomes invalid logically—optional choice:
-        // Keep back or clear it; usually clear it to avoid mismatched pair.
-        _back = null;
-        _active = TwoTyrePos.front;
-      } else {
-        _back = null;
-        // If front exists, we want to capture back again
-        _active = TwoTyrePos.back;
+      switch (pos) {
+        case TwoTyrePos.front:
+          _front = null;
+          break;
+        case TwoTyrePos.frontSidewall:
+          _frontSidewall = null;
+          break;
+        case TwoTyrePos.back:
+          _back = null;
+          break;
+        case TwoTyrePos.backSidewall:
+          _backSidewall = null;
+          break;
       }
+      _active = pos;
       _error = null;
     });
   }
 
   String _stepText() {
-    if (_bothCaptured) return 'Both tyres selected ✅';
-    if (_front == null) return 'Select FRONT tyre image';
-    return 'Now select BACK tyre image';
+    if (_bothCaptured) return 'All tyre images selected ✅';
+    if (_front == null) return 'Select FRONT tyre tread image';
+    if (_frontSidewall == null) return 'Select FRONT tyre sidewall image';
+    if (_back == null) return 'Select BACK tyre tread image';
+    return 'Select BACK tyre sidewall image';
   }
 
   @override
@@ -444,7 +470,9 @@ class _TwoWheelerGenerateReportScreenState extends State<TwoWheelerGenerateRepor
               s: s,
               active: _active,
               front: _front,
+              frontSidewall: _frontSidewall,
               back: _back,
+              backSidewall: _backSidewall,
               onSelect: (pos) => setState(() => _active = pos),
               onDelete: _retake,
             ),
@@ -509,7 +537,9 @@ class _CapturedTwoThumbsRow extends StatelessWidget {
     required this.s,
     required this.active,
     required this.front,
+    required this.frontSidewall,
     required this.back,
+    required this.backSidewall,
     required this.onSelect,
     required this.onDelete,
   });
@@ -517,7 +547,9 @@ class _CapturedTwoThumbsRow extends StatelessWidget {
   final double s;
   final TwoTyrePos active;
   final XFile? front;
+  final XFile? frontSidewall;
   final XFile? back;
+  final XFile? backSidewall;
 
   final ValueChanged<TwoTyrePos> onSelect;
   final ValueChanged<TwoTyrePos> onDelete;
@@ -541,7 +573,11 @@ class _CapturedTwoThumbsRow extends StatelessWidget {
         children: [
           Expanded(child: _thumb("FRONT", TwoTyrePos.front, front)),
           SizedBox(width: 8 * s),
+          Expanded(child: _thumb("FR-S", TwoTyrePos.frontSidewall, frontSidewall)),
+          SizedBox(width: 8 * s),
           Expanded(child: _thumb("BACK", TwoTyrePos.back, back)),
+          SizedBox(width: 8 * s),
+          Expanded(child: _thumb("BK-S", TwoTyrePos.backSidewall, backSidewall)),
         ],
       ),
     );

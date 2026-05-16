@@ -466,10 +466,13 @@ Future<void> _onPlacesPrewarmRequested(
     return;
   }
 
-  if (e.frontPath.trim().isEmpty || e.backPath.trim().isEmpty) {
+  if (e.frontPath.trim().isEmpty ||
+      e.frontSidewallPath.trim().isEmpty ||
+      e.backPath.trim().isEmpty ||
+      e.backSidewallPath.trim().isEmpty) {
     emit(state.copyWith(
       twoWheelerStatus: TwoWheelerStatus.failure,
-      twoWheelerError: 'Missing front/back tyre images.',
+      twoWheelerError: 'Missing front/back tread or sidewall tyre images.',
     ));
     return;
   }
@@ -503,7 +506,9 @@ Future<void> _onPlacesPrewarmRequested(
     vehicleId: e.vehicleId.trim(),
     vin: (e.vin ?? '').trim().isEmpty ? null : e.vin!.trim(),
     frontPath: e.frontPath.trim(),
+    frontSidewallPath: e.frontSidewallPath.trim(),
     backPath: e.backPath.trim(),
+    backSidewallPath: e.backSidewallPath.trim(),
 
     // ✅ REQUIRED
     frontTyreId: e.frontTyreId.trim(),
@@ -1107,7 +1112,11 @@ Future<void> _onCurrentLocationRequested(
     if (!File(e.frontLeftPath).existsSync() ||
         !File(e.frontRightPath).existsSync() ||
         !File(e.backLeftPath).existsSync() ||
-        !File(e.backRightPath).existsSync()) {
+        !File(e.backRightPath).existsSync() ||
+        !File(e.frontLeftSidewallPath).existsSync() ||
+        !File(e.frontRightSidewallPath).existsSync() ||
+        !File(e.backLeftSidewallPath).existsSync() ||
+        !File(e.backRightSidewallPath).existsSync()) {
       emit(state.copyWith(
         fourWheelerStatus: FourWheelerStatus.failure,
         fourWheelerError: 'One or more images not found.',
@@ -1135,6 +1144,10 @@ Future<void> _onCurrentLocationRequested(
       frontRightPath: e.frontRightPath,
       backLeftPath: e.backLeftPath,
       backRightPath: e.backRightPath,
+      frontLeftSidewallPath: e.frontLeftSidewallPath,
+      frontRightSidewallPath: e.frontRightSidewallPath,
+      backLeftSidewallPath: e.backLeftSidewallPath,
+      backRightSidewallPath: e.backRightSidewallPath,
     );
 
     final r = await repo.uploadFourWheeler(req);

@@ -1,15 +1,24 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:ios_tiretest_ai/Screens/scanner_front_tire_screen.dart';
 import 'package:ios_tiretest_ai/Widgets/bottom_action_bar.dart';
-import 'dart:async';
+
 import 'generate_report_screen.dart';
-import 'dart:io';
-import 'package:image_picker/image_picker.dart';
 
-
-
-enum TyrePos { frontLeft, frontRight, backLeft, backRight }
+enum TyrePos {
+  frontLeft,
+  frontRight,
+  backLeft,
+  backRight,
+  frontLeftSidewall,
+  frontRightSidewall,
+  backLeftSidewall,
+  backRightSidewall,
+}
 
 class CarTyresScannerScreen extends StatefulWidget {
   final String title;
@@ -52,6 +61,10 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
   XFile? _frontRight;
   XFile? _backLeft;
   XFile? _backRight;
+  XFile? _frontLeftSidewall;
+  XFile? _frontRightSidewall;
+  XFile? _backLeftSidewall;
+  XFile? _backRightSidewall;
 
   TyrePos _active = TyrePos.frontLeft;
   String? _error;
@@ -62,7 +75,11 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
       _frontLeft != null &&
       _frontRight != null &&
       _backLeft != null &&
-      _backRight != null;
+      _backRight != null &&
+      _frontLeftSidewall != null &&
+      _frontRightSidewall != null &&
+      _backLeftSidewall != null &&
+      _backRightSidewall != null;
 
   @override
   void initState() {
@@ -105,7 +122,10 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
     _stopping = true;
 
     final c = _controller;
-    if (c == null) return;
+    if (c == null) {
+      _stopping = false;
+      return;
+    }
 
     try {
       if (mounted) {
@@ -144,6 +164,14 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
         return _backLeft;
       case TyrePos.backRight:
         return _backRight;
+      case TyrePos.frontLeftSidewall:
+        return _frontLeftSidewall;
+      case TyrePos.frontRightSidewall:
+        return _frontRightSidewall;
+      case TyrePos.backLeftSidewall:
+        return _backLeftSidewall;
+      case TyrePos.backRightSidewall:
+        return _backRightSidewall;
     }
   }
 
@@ -165,6 +193,22 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
           break;
         case TyrePos.backRight:
           _backRight = file;
+          _active = TyrePos.frontLeftSidewall;
+          break;
+        case TyrePos.frontLeftSidewall:
+          _frontLeftSidewall = file;
+          _active = TyrePos.frontRightSidewall;
+          break;
+        case TyrePos.frontRightSidewall:
+          _frontRightSidewall = file;
+          _active = TyrePos.backLeftSidewall;
+          break;
+        case TyrePos.backLeftSidewall:
+          _backLeftSidewall = file;
+          _active = TyrePos.backRightSidewall;
+          break;
+        case TyrePos.backRightSidewall:
+          _backRightSidewall = file;
           break;
       }
     });
@@ -225,6 +269,10 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
           frontRightPath: _frontRight!.path,
           backLeftPath: _backLeft!.path,
           backRightPath: _backRight!.path,
+          frontLeftSidewallPath: _frontLeftSidewall!.path,
+          frontRightSidewallPath: _frontRightSidewall!.path,
+          backLeftSidewallPath: _backLeftSidewall!.path,
+          backRightSidewallPath: _backRightSidewall!.path,
           userId: widget.userId,
           vehicleId: widget.vehicleId,
           token: widget.token,
@@ -238,26 +286,27 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
       ),
     );
 
-    // ✅ allow navigation again
     _navigated = false;
 
-    // ✅ If user tapped "Retake Images" on report screen, clear selections and restart camera
     if (mounted && result == 'retake') {
       setState(() {
         _frontLeft = null;
         _frontRight = null;
         _backLeft = null;
         _backRight = null;
+        _frontLeftSidewall = null;
+        _frontRightSidewall = null;
+        _backLeftSidewall = null;
+        _backRightSidewall = null;
         _active = TyrePos.frontLeft;
         _error = null;
       });
     }
 
-    // ✅ ensure camera preview is back when returning
     if (mounted) {
       await _initCam();
     }
-}
+  }
 
   void _retake(TyrePos pos) {
     setState(() {
@@ -274,6 +323,18 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
         case TyrePos.backRight:
           _backRight = null;
           break;
+        case TyrePos.frontLeftSidewall:
+          _frontLeftSidewall = null;
+          break;
+        case TyrePos.frontRightSidewall:
+          _frontRightSidewall = null;
+          break;
+        case TyrePos.backLeftSidewall:
+          _backLeftSidewall = null;
+          break;
+        case TyrePos.backRightSidewall:
+          _backRightSidewall = null;
+          break;
       }
       _active = pos;
       _error = null;
@@ -283,8 +344,6 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final s = MediaQuery.sizeOf(context).width / 390.0;
-
-    final activeFile = _getFileForPos(_active);
 
     return Scaffold(
       body: Stack(
@@ -309,7 +368,7 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
                   ),
                   Expanded(
                     child: Text(
-                      widget.title,
+                      _labelForPos(_active),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'ClashGrotesk',
@@ -358,35 +417,26 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
             right: 16 * s,
             child: Column(
               children: [
-               /* _TyreSelectorBar(
+                _CaptureProgressCard(
                   s: s,
-                  active: _active,
-                  frontLeft: _frontLeft != null,
-                  frontRight: _frontRight != null,
-                  backLeft: _backLeft != null,
-                  backRight: _backRight != null,
-                  disabled: false,
-                  onSelect: (pos) => setState(() => _active = pos),
-                  onRetake: _retake,
+                  activeLabel: _labelForPos(_active),
+                  captured: _capturedCount,
+                  total: 8,
                 ),
-                */
                 SizedBox(height: 10 * s),
-
-              /*  _ActiveTyrePreview(
-                  s: s,
-                  label: _labelForPos(_active),
-                  file: activeFile,
-                ),
-
-                // ✅ NEW UI: thumbnails row with delete
-                SizedBox(height: 10 * s),*/
-                _CapturedThumbsRow(
+                _CapturedThumbsGrid(
                   s: s,
                   active: _active,
-                  frontLeft: _frontLeft,
-                  frontRight: _frontRight,
-                  backLeft: _backLeft,
-                  backRight: _backRight,
+                  files: {
+                    TyrePos.frontLeft: _frontLeft,
+                    TyrePos.frontRight: _frontRight,
+                    TyrePos.backLeft: _backLeft,
+                    TyrePos.backRight: _backRight,
+                    TyrePos.frontLeftSidewall: _frontLeftSidewall,
+                    TyrePos.frontRightSidewall: _frontRightSidewall,
+                    TyrePos.backLeftSidewall: _backLeftSidewall,
+                    TyrePos.backRightSidewall: _backRightSidewall,
+                  },
                   onSelect: (pos) => setState(() => _active = pos),
                   onDelete: _retake,
                 ),
@@ -401,11 +451,7 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
             child: BottomActionBar(
               enabled: _ready && !_stopping,
               onPickGallery: _pickFromGallery,
-            //  onPickDocs: () {},
               onCapture: _capture,
-              // galleryIconAsset: 'assets/gallery_icon.png',
-              // captureIconAsset: 'assets/image_capture_icon.png',
-             // docsIconAsset: 'assets/document_icon.png',
             ),
           ),
         ],
@@ -413,40 +459,88 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
     );
   }
 
+  int get _capturedCount => [
+        _frontLeft,
+        _frontRight,
+        _backLeft,
+        _backRight,
+        _frontLeftSidewall,
+        _frontRightSidewall,
+        _backLeftSidewall,
+        _backRightSidewall,
+      ].where((e) => e != null).length;
+
   String _labelForPos(TyrePos pos) {
     switch (pos) {
       case TyrePos.frontLeft:
-        return "Front Left";
+        return "Front Left Tread";
       case TyrePos.frontRight:
-        return "Front Right";
+        return "Front Right Tread";
       case TyrePos.backLeft:
-        return "Back Left";
+        return "Back Left Tread";
       case TyrePos.backRight:
-        return "Back Right";
+        return "Back Right Tread";
+      case TyrePos.frontLeftSidewall:
+        return "Front Left Sidewall";
+      case TyrePos.frontRightSidewall:
+        return "Front Right Sidewall";
+      case TyrePos.backLeftSidewall:
+        return "Back Left Sidewall";
+      case TyrePos.backRightSidewall:
+        return "Back Right Sidewall";
     }
   }
 }
 
+class _CaptureProgressCard extends StatelessWidget {
+  const _CaptureProgressCard({
+    required this.s,
+    required this.activeLabel,
+    required this.captured,
+    required this.total,
+  });
 
-class _CapturedThumbsRow extends StatelessWidget {
-  const _CapturedThumbsRow({
+  final double s;
+  final String activeLabel;
+  final int captured;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(10 * s),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(.35),
+        borderRadius: BorderRadius.circular(14 * s),
+        border: Border.all(color: Colors.white.withOpacity(.10)),
+      ),
+      child: Text(
+        'Capture $captured/$total • $activeLabel',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontFamily: 'ClashGrotesk',
+          color: Colors.white,
+          fontWeight: FontWeight.w900,
+          fontSize: 14 * s,
+        ),
+      ),
+    );
+  }
+}
+
+class _CapturedThumbsGrid extends StatelessWidget {
+  const _CapturedThumbsGrid({
     required this.s,
     required this.active,
-    required this.frontLeft,
-    required this.frontRight,
-    required this.backLeft,
-    required this.backRight,
+    required this.files,
     required this.onSelect,
     required this.onDelete,
   });
 
   final double s;
   final TyrePos active;
-  final XFile? frontLeft;
-  final XFile? frontRight;
-  final XFile? backLeft;
-  final XFile? backRight;
-
+  final Map<TyrePos, XFile?> files;
   final ValueChanged<TyrePos> onSelect;
   final ValueChanged<TyrePos> onDelete;
 
@@ -456,8 +550,20 @@ class _CapturedThumbsRow extends StatelessWidget {
     end: Alignment.centerRight,
   );
 
+  static const _items = <TyrePos, String>{
+    TyrePos.frontLeft: 'FL',
+    TyrePos.frontRight: 'FR',
+    TyrePos.backLeft: 'BL',
+    TyrePos.backRight: 'BR',
+    TyrePos.frontLeftSidewall: 'FL-S',
+    TyrePos.frontRightSidewall: 'FR-S',
+    TyrePos.backLeftSidewall: 'BL-S',
+    TyrePos.backRightSidewall: 'BR-S',
+  };
+
   @override
   Widget build(BuildContext context) {
+    final entries = _items.entries.toList();
     return Container(
       padding: EdgeInsets.all(10 * s),
       decoration: BoxDecoration(
@@ -465,16 +571,17 @@ class _CapturedThumbsRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(14 * s),
         border: Border.all(color: Colors.white.withOpacity(.10)),
       ),
-      child: Row(
-        children: [
-          Expanded(child: _thumb("FL", TyrePos.frontLeft, frontLeft)),
-          SizedBox(width: 8 * s),
-          Expanded(child: _thumb("FR", TyrePos.frontRight, frontRight)),
-          SizedBox(width: 8 * s),
-          Expanded(child: _thumb("BL", TyrePos.backLeft, backLeft)),
-          SizedBox(width: 8 * s),
-          Expanded(child: _thumb("BR", TyrePos.backRight, backRight)),
-        ],
+      child: GridView.builder(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 4,
+          crossAxisSpacing: 8 * s,
+          mainAxisSpacing: 8 * s,
+        ),
+        itemCount: entries.length,
+        itemBuilder: (_, i) => _thumb(entries[i].value, entries[i].key, files[entries[i].key]),
       ),
     );
   }
@@ -498,88 +605,68 @@ class _CapturedThumbsRow extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(10),
-          child: AspectRatio(
-            aspectRatio: 1,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (file != null)
-                  Image.file(File(file.path), fit: BoxFit.cover)
-                else
-                  Container(
-                    color: Colors.white.withOpacity(.08),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.image_outlined,
-                              color: Colors.white.withOpacity(.85),
-                              size: 18 * s),
-                          SizedBox(height: 4 * s),
-                          Text(
-                            short,
-                            style: TextStyle(
-                              fontFamily: 'ClashGrotesk',
-                              color: Colors.white.withOpacity(.9),
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11.5 * s,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                Positioned(
-                  left: 6 * s,
-                  bottom: 6 * s,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 7 * s, vertical: 4 * s),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(.55),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: Colors.white.withOpacity(.10)),
-                    ),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (file != null)
+                Image.file(File(file.path), fit: BoxFit.cover)
+              else
+                Container(
+                  color: Colors.white.withOpacity(.08),
+                  child: Center(
                     child: Text(
                       short,
                       style: TextStyle(
                         fontFamily: 'ClashGrotesk',
-                        color: Colors.white,
+                        color: Colors.white.withOpacity(.9),
                         fontWeight: FontWeight.w800,
-                        fontSize: 11 * s,
+                        fontSize: 11.5 * s,
                       ),
                     ),
                   ),
                 ),
-                if (file != null)
-                  Positioned(
-                    right: 6 * s,
-                    top: 6 * s,
-                    child: GestureDetector(
-                      onTap: () => onDelete(pos),
-                      child: Container(
-                        width: 24 * s,
-                        height: 24 * s,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(.55),
-                          shape: BoxShape.circle,
-                          border:
-                              Border.all(color: Colors.white.withOpacity(.12)),
-                        ),
-                        child: Icon(
-                          Icons.close_rounded,
-                          size: 16 * s,
-                          color: Colors.white,
-                        ),
-                      ),
+              Positioned(
+                left: 5 * s,
+                bottom: 5 * s,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 6 * s, vertical: 3 * s),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(.55),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    short,
+                    style: TextStyle(
+                      fontFamily: 'ClashGrotesk',
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 9.5 * s,
                     ),
                   ),
-              ],
-            ),
+                ),
+              ),
+              if (file != null)
+                Positioned(
+                  right: 4 * s,
+                  top: 4 * s,
+                  child: GestureDetector(
+                    onTap: () => onDelete(pos),
+                    child: Container(
+                      width: 22 * s,
+                      height: 22 * s,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(.55),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withOpacity(.12)),
+                      ),
+                      child: Icon(Icons.close_rounded, size: 15 * s, color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
     );
   }
 }
-

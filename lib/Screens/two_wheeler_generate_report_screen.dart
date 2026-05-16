@@ -57,11 +57,13 @@ class TwoWheelerReportResultScreen extends StatefulWidget {
   final String backTyreId;
 
   final String frontPath;
+  final String frontSidewallPath;
   final String backPath;
+  final String backSidewallPath;
 
   const TwoWheelerReportResultScreen({
     super.key,
-    this.title = "Inspection Report",
+    this.title = "Inspection Report1122",
     required this.userId,
     required this.vehicleId,
     required this.token,
@@ -70,7 +72,9 @@ class TwoWheelerReportResultScreen extends StatefulWidget {
     required this.frontTyreId,
     required this.backTyreId,
     required this.frontPath,
+    required this.frontSidewallPath,
     required this.backPath,
+    required this.backSidewallPath,
   });
 
   @override
@@ -133,7 +137,9 @@ class _TwoWheelerReportResultScreenState
             vin: widget.vin,
             vehicleType: widget.vehicleType,
             frontPath: widget.frontPath,
+            frontSidewallPath: widget.frontSidewallPath,
             backPath: widget.backPath,
+            backSidewallPath: widget.backSidewallPath,
             frontTyreId: widget.frontTyreId,
             backTyreId: widget.backTyreId,
           ),

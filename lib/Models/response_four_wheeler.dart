@@ -162,6 +162,11 @@ class FourWheelerData {
   final FourWheelerTyreSide? backLeft;
   final FourWheelerTyreSide? backRight;
 
+  final FourWheelerTyreSide? frontLeftSidewall;
+  final FourWheelerTyreSide? frontRightSidewall;
+  final FourWheelerTyreSide? backLeftSidewall;
+  final FourWheelerTyreSide? backRightSidewall;
+
   const FourWheelerData({
     required this.userId,
     required this.vehicleType,
@@ -172,6 +177,10 @@ class FourWheelerData {
     required this.frontRight,
     required this.backLeft,
     required this.backRight,
+    this.frontLeftSidewall,
+    this.frontRightSidewall,
+    this.backLeftSidewall,
+    this.backRightSidewall,
   });
 
   static String _s(dynamic v) => v == null ? '' : v.toString();
@@ -203,6 +212,18 @@ class FourWheelerData {
     if (backRight != null && backRight!.isTire == false) {
       list.add(const NotTyreSide('Back Right', 'back_right'));
     }
+    if (frontLeftSidewall != null && frontLeftSidewall!.isTire == false) {
+      list.add(const NotTyreSide('Front Left Sidewall', 'front_left_sidewall'));
+    }
+    if (frontRightSidewall != null && frontRightSidewall!.isTire == false) {
+      list.add(const NotTyreSide('Front Right Sidewall', 'front_right_sidewall'));
+    }
+    if (backLeftSidewall != null && backLeftSidewall!.isTire == false) {
+      list.add(const NotTyreSide('Back Left Sidewall', 'back_left_sidewall'));
+    }
+    if (backRightSidewall != null && backRightSidewall!.isTire == false) {
+      list.add(const NotTyreSide('Back Right Sidewall', 'back_right_sidewall'));
+    }
     return list;
   }
 
@@ -211,7 +232,11 @@ class FourWheelerData {
     final hasNested = json.containsKey('front_left') ||
         json.containsKey('front_right') ||
         json.containsKey('back_left') ||
-        json.containsKey('back_right');
+        json.containsKey('back_right') ||
+        json.containsKey('front_left_sidewall') ||
+        json.containsKey('front_right_sidewall') ||
+        json.containsKey('back_left_sidewall') ||
+        json.containsKey('back_right_sidewall');
 
     if (hasNested) {
       return FourWheelerData(
@@ -224,6 +249,10 @@ class FourWheelerData {
         frontRight: _side(json['front_right']),
         backLeft: _side(json['back_left']),
         backRight: _side(json['back_right']),
+        frontLeftSidewall: _side(json['front_left_sidewall']),
+        frontRightSidewall: _side(json['front_right_sidewall']),
+        backLeftSidewall: _side(json['back_left_sidewall']),
+        backRightSidewall: _side(json['back_right_sidewall']),
       );
     }
 
@@ -256,6 +285,10 @@ class FourWheelerData {
       frontRight: _fromOld('Front Right'),
       backLeft: _fromOld('Back Left'),
       backRight: _fromOld('Back Right'),
+      frontLeftSidewall: null,
+      frontRightSidewall: null,
+      backLeftSidewall: null,
+      backRightSidewall: null,
     );
   }
 
@@ -269,6 +302,10 @@ class FourWheelerData {
         'front_right': frontRight?.toJson(),
         'back_left': backLeft?.toJson(),
         'back_right': backRight?.toJson(),
+        'front_left_sidewall': frontLeftSidewall?.toJson(),
+        'front_right_sidewall': frontRightSidewall?.toJson(),
+        'back_left_sidewall': backLeftSidewall?.toJson(),
+        'back_right_sidewall': backRightSidewall?.toJson(),
       };
 }
 

@@ -51,6 +51,11 @@ class UploadFourWheelerRequested extends AuthEvent {
   final String backLeftPath;
   final String backRightPath;
 
+  final String frontLeftSidewallPath;
+  final String frontRightSidewallPath;
+  final String backLeftSidewallPath;
+  final String backRightSidewallPath;
+
   const UploadFourWheelerRequested({
     required this.vehicleId,
     this.vehicleType = 'car',
@@ -63,6 +68,10 @@ class UploadFourWheelerRequested extends AuthEvent {
     required this.frontRightPath,
     required this.backLeftPath,
     required this.backRightPath,
+    required this.frontLeftSidewallPath,
+    required this.frontRightSidewallPath,
+    required this.backLeftSidewallPath,
+    required this.backRightSidewallPath,
   });
 
   @override
@@ -78,6 +87,10 @@ class UploadFourWheelerRequested extends AuthEvent {
         frontRightPath,
         backLeftPath,
         backRightPath,
+        frontLeftSidewallPath,
+        frontRightSidewallPath,
+        backLeftSidewallPath,
+        backRightSidewallPath,
       ];
 }
 
@@ -318,7 +331,9 @@ class UploadTwoWheelerRequested extends AuthEvent {
   final String? vin;
 
   final String frontPath;
+  final String frontSidewallPath;
   final String backPath;
+  final String backSidewallPath;
 
   // ✅ NEW
   final String frontTyreId;
@@ -331,7 +346,9 @@ class UploadTwoWheelerRequested extends AuthEvent {
     required this.token,
     this.vin,
     required this.frontPath,
+    required this.frontSidewallPath,
     required this.backPath,
+    required this.backSidewallPath,
 
     // ✅ REQUIRED
     required this.frontTyreId,
@@ -346,7 +363,9 @@ class UploadTwoWheelerRequested extends AuthEvent {
         token,
         vin,
         frontPath,
+        frontSidewallPath,
         backPath,
+        backSidewallPath,
         frontTyreId,
         backTyreId,
       ];

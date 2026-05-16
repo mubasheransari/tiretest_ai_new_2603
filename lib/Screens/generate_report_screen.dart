@@ -19,6 +19,10 @@ class InspectionResultScreen extends StatefulWidget {
     required this.frontRightPath,
     required this.backLeftPath,
     required this.backRightPath,
+    this.frontLeftSidewallPath,
+    this.frontRightSidewallPath,
+    this.backLeftSidewallPath,
+    this.backRightSidewallPath,
     required this.vehicleId,
     required this.userId,
     required this.token,
@@ -30,6 +34,11 @@ class InspectionResultScreen extends StatefulWidget {
   final String frontRightPath;
   final String backLeftPath;
   final String backRightPath;
+
+  final String? frontLeftSidewallPath;
+  final String? frontRightSidewallPath;
+  final String? backLeftSidewallPath;
+  final String? backRightSidewallPath;
 
   final String vehicleId;
   final String userId;
@@ -89,12 +98,32 @@ class _InspectionResultScreenState extends State<InspectionResultScreen> {
         _imgProvider(localPath: widget.backLeftPath, apiValue: d?.backLeft?.image);
     final brImg =
         _imgProvider(localPath: widget.backRightPath, apiValue: d?.backRight?.image);
+    final flsImg = _imgProvider(
+      localPath: widget.frontLeftSidewallPath ?? widget.frontLeftPath,
+      apiValue: d?.frontLeftSidewall?.image,
+    );
+    final frsImg = _imgProvider(
+      localPath: widget.frontRightSidewallPath ?? widget.frontRightPath,
+      apiValue: d?.frontRightSidewall?.image,
+    );
+    final blsImg = _imgProvider(
+      localPath: widget.backLeftSidewallPath ?? widget.backLeftPath,
+      apiValue: d?.backLeftSidewall?.image,
+    );
+    final brsImg = _imgProvider(
+      localPath: widget.backRightSidewallPath ?? widget.backRightPath,
+      apiValue: d?.backRightSidewall?.image,
+    );
 
     final wheelImages = <_WheelCardData>[
       _WheelCardData(image: flImg, label: 'Front Left'),
       _WheelCardData(image: frImg, label: 'Front Right'),
       _WheelCardData(image: blImg, label: 'Back Left'),
       _WheelCardData(image: brImg, label: 'Back Right'),
+      _WheelCardData(image: flsImg, label: 'FL Sidewall'),
+      _WheelCardData(image: frsImg, label: 'FR Sidewall'),
+      _WheelCardData(image: blsImg, label: 'BL Sidewall'),
+      _WheelCardData(image: brsImg, label: 'BR Sidewall'),
     ];
 
     final summaryText = _composeSelectedSummary(selectedTyre);
@@ -120,7 +149,7 @@ class _InspectionResultScreenState extends State<InspectionResultScreen> {
         ),
         centerTitle: true,
         title: Text(
-          'Inspection Report',
+          'Inspection Report112233',
           style: TextStyle(
             fontFamily: 'ClashGrotesk',
             fontSize: 20 * s,
@@ -925,6 +954,10 @@ class GenerateReportScreen extends StatefulWidget {
     required this.frontRightPath,
     required this.backLeftPath,
     required this.backRightPath,
+    required this.frontLeftSidewallPath,
+    required this.frontRightSidewallPath,
+    required this.backLeftSidewallPath,
+    required this.backRightSidewallPath,
     required this.userId,
     required this.vehicleId,
     required this.token,
@@ -940,6 +973,11 @@ class GenerateReportScreen extends StatefulWidget {
   final String frontRightPath;
   final String backLeftPath;
   final String backRightPath;
+
+  final String frontLeftSidewallPath;
+  final String frontRightSidewallPath;
+  final String backLeftSidewallPath;
+  final String backRightSidewallPath;
 
   final String userId;
   final String vehicleId;
@@ -998,6 +1036,10 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
         frontRightPath: widget.frontRightPath,
         backLeftPath: widget.backLeftPath,
         backRightPath: widget.backRightPath,
+        frontLeftSidewallPath: widget.frontLeftSidewallPath,
+        frontRightSidewallPath: widget.frontRightSidewallPath,
+        backLeftSidewallPath: widget.backLeftSidewallPath,
+        backRightSidewallPath: widget.backRightSidewallPath,
       ),
     );
   }
@@ -1042,6 +1084,10 @@ class _GenerateReportScreenState extends State<GenerateReportScreen> {
           frontRightPath: widget.frontRightPath,
           backLeftPath: widget.backLeftPath,
           backRightPath: widget.backRightPath,
+          frontLeftSidewallPath: widget.frontLeftSidewallPath,
+          frontRightSidewallPath: widget.frontRightSidewallPath,
+          backLeftSidewallPath: widget.backLeftSidewallPath,
+          backRightSidewallPath: widget.backRightSidewallPath,
           vehicleId: widget.vehicleId,
           userId: widget.userId,
           token: widget.token,
@@ -1407,6 +1453,22 @@ class _FullscreenVideoOnly extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // class InspectionResultScreen extends StatefulWidget {
 //   const InspectionResultScreen({
 //     super.key,

@@ -16,6 +16,11 @@ class FourWheelerUploadRequest {
   final String backLeftPath;
   final String backRightPath;
 
+  final String frontLeftSidewallPath;
+  final String frontRightSidewallPath;
+  final String backLeftSidewallPath;
+  final String backRightSidewallPath;
+
   const FourWheelerUploadRequest({
     required this.userId,
     required this.token,
@@ -30,5 +35,9 @@ class FourWheelerUploadRequest {
     required this.frontRightPath,
     required this.backLeftPath,
     required this.backRightPath,
+    required this.frontLeftSidewallPath,
+    required this.frontRightSidewallPath,
+    required this.backLeftSidewallPath,
+    required this.backRightSidewallPath,
   });
 }

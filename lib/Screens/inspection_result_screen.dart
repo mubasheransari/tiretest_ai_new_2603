@@ -77,7 +77,7 @@ class _InspectionResultScreenState extends State<InspectionResultScreen> {
         ),
         centerTitle: true,
         title: Text(
-          'inspection Report',
+          'inspection Report112233',
           style: TextStyle(
             fontFamily: 'ClashGrotesk',
             fontSize: 20 * s,

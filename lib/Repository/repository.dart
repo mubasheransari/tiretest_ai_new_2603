@@ -239,7 +239,12 @@ Future<Result<TwoWheelerTyreUploadResponse>> uploadTwoWheeler(
 
   // ✅ check files exist
   try {
-    final paths = [req.frontPath, req.backPath];
+    final paths = [
+      req.frontPath,
+      req.frontSidewallPath,
+      req.backPath,
+      req.backSidewallPath,
+    ];
     for (final path in paths) {
       final f = File(path);
       if (!await f.exists()) {
@@ -257,9 +262,17 @@ Future<Result<TwoWheelerTyreUploadResponse>> uploadTwoWheeler(
         ? await _compressSafe(req.frontPath)
         : File(req.frontPath);
 
+    final frontSidewallFile = enableCompression
+        ? await _compressSafe(req.frontSidewallPath)
+        : File(req.frontSidewallPath);
+
     final backFile = enableCompression
         ? await _compressSafe(req.backPath)
         : File(req.backPath);
+
+    final backSidewallFile = enableCompression
+        ? await _compressSafe(req.backSidewallPath)
+        : File(req.backSidewallPath);
 
     final uri = Uri.parse(url);
     final request = http.MultipartRequest('POST', uri);
@@ -285,9 +298,19 @@ Future<Result<TwoWheelerTyreUploadResponse>> uploadTwoWheeler(
         filename: p.basename(frontFile.path),
       ),
       await http.MultipartFile.fromPath(
+        'front_sidewall',
+        frontSidewallFile.path,
+        filename: p.basename(frontSidewallFile.path),
+      ),
+      await http.MultipartFile.fromPath(
         'backimage',
         backFile.path,
         filename: p.basename(backFile.path),
+      ),
+      await http.MultipartFile.fromPath(
+        'back_sidewall',
+        backSidewallFile.path,
+        filename: p.basename(backSidewallFile.path),
       ),
     ]);
 
@@ -300,6 +323,8 @@ Future<Result<TwoWheelerTyreUploadResponse>> uploadTwoWheeler(
       'Fields: {user_id:$userId, vehicle_id:$vehicleId, vehicle_type:$vehicleTypeValue, vin:$vinValue, '
       'front_tyre_id:$frontTyreId, back_tyre_id:$backTyreId}',
     );
+    // ignore: avoid_print
+    print('Files: FRONT=${frontFile.path} | FRONT-S=${frontSidewallFile.path} | BACK=${backFile.path} | BACK-S=${backSidewallFile.path}');
 
     final streamed = await request.send().timeout(const Duration(seconds: 200));
     final status = streamed.statusCode;
@@ -824,6 +849,10 @@ Future<Result<ResponseFourWheeler>> uploadFourWheeler(
       req.frontRightPath,
       req.backLeftPath,
       req.backRightPath,
+      req.frontLeftSidewallPath,
+      req.frontRightSidewallPath,
+      req.backLeftSidewallPath,
+      req.backRightSidewallPath,
     ];
 
     int total = 0;
@@ -861,10 +890,22 @@ Future<Result<ResponseFourWheeler>> uploadFourWheeler(
     final br = enableCompression
         ? await _compressSafe(req.backRightPath)
         : File(req.backRightPath);
+    final fls = enableCompression
+        ? await _compressSafe(req.frontLeftSidewallPath)
+        : File(req.frontLeftSidewallPath);
+    final frs = enableCompression
+        ? await _compressSafe(req.frontRightSidewallPath)
+        : File(req.frontRightSidewallPath);
+    final bls = enableCompression
+        ? await _compressSafe(req.backLeftSidewallPath)
+        : File(req.backLeftSidewallPath);
+    final brs = enableCompression
+        ? await _compressSafe(req.backRightSidewallPath)
+        : File(req.backRightSidewallPath);
 
     // ✅ log sizes after compression
     try {
-      final files = [fl, fr, bl, br];
+      final files = [fl, fr, bl, br, fls, frs, bls, brs];
       int total = 0;
       for (final f in files) {
         final bytes = await f.length();
@@ -923,6 +964,26 @@ Future<Result<ResponseFourWheeler>> uploadFourWheeler(
         br.path,
         filename: p.basename(br.path),
       ),
+      await http.MultipartFile.fromPath(
+        'front_left_sidewall',
+        fls.path,
+        filename: p.basename(fls.path),
+      ),
+      await http.MultipartFile.fromPath(
+        'front_right_sidewall',
+        frs.path,
+        filename: p.basename(frs.path),
+      ),
+      await http.MultipartFile.fromPath(
+        'back_left_sidewall',
+        bls.path,
+        filename: p.basename(bls.path),
+      ),
+      await http.MultipartFile.fromPath(
+        'back_right_sidewall',
+        brs.path,
+        filename: p.basename(brs.path),
+      ),
     ]);
 
     // ignore: avoid_print
@@ -936,7 +997,7 @@ Future<Result<ResponseFourWheeler>> uploadFourWheeler(
         'back_left_tyre_id:${req.backLeftTyreId}, back_right_tyre_id:${req.backRightTyreId}}');
     // ignore: avoid_print
     print(
-        'Files: FL=${fl.path} | FR=${fr.path} | BL=${bl.path} | BR=${br.path}');
+        'Files: FL=${fl.path} | FR=${fr.path} | BL=${bl.path} | BR=${br.path} | FLS=${fls.path} | FRS=${frs.path} | BLS=${bls.path} | BRS=${brs.path}');
 
     // ✅ send (http has no progress callback)
     final streamed = await request.send().timeout(

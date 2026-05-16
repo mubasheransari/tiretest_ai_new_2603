@@ -25,7 +25,9 @@ class TyreUploadRequest {
   final String? vin;
 
   final String frontPath;
+  final String frontSidewallPath;
   final String backPath;
+  final String backSidewallPath;
 
   // ✅ add these
   final String frontTyreId;
@@ -38,7 +40,9 @@ class TyreUploadRequest {
     required this.vehicleId,
     this.vin,
     required this.frontPath,
+    required this.frontSidewallPath,
     required this.backPath,
+    required this.backSidewallPath,
     required this.frontTyreId,
     required this.backTyreId,
   });
