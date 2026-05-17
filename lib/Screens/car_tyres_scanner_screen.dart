@@ -9,6 +9,18 @@ import 'package:ios_tiretest_ai/Widgets/bottom_action_bar.dart';
 
 import 'generate_report_screen.dart';
 
+
+import 'dart:async';
+import 'dart:io';
+import 'dart:math' as math;
+
+import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:ios_tiretest_ai/Widgets/bottom_action_bar.dart';
+
+import 'generate_report_screen.dart';
+
 enum TyrePos {
   frontLeft,
   frontRight,
@@ -56,6 +68,7 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
 
   bool _ready = false;
   bool _stopping = false;
+  bool _flashOn = false;
 
   XFile? _frontLeft;
   XFile? _frontRight;
@@ -71,6 +84,9 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
   bool _navigated = false;
   final ImagePicker _picker = ImagePicker();
 
+  Timer? _scanTimer;
+  double _scanPhase = 0;
+
   bool get _allCaptured =>
       _frontLeft != null &&
       _frontRight != null &&
@@ -84,7 +100,16 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
   @override
   void initState() {
     super.initState();
+    _startScanLine();
     _initCam();
+  }
+
+  void _startScanLine() {
+    _scanTimer?.cancel();
+    _scanTimer = Timer.periodic(const Duration(milliseconds: 30), (_) {
+      if (!mounted) return;
+      setState(() => _scanPhase = (_scanPhase + 1) % 10000);
+    });
   }
 
   Future<void> _initCam() async {
@@ -102,18 +127,53 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
       );
 
       await c.initialize();
-      if (!mounted) return;
+
+      try {
+        await c.setFlashMode(FlashMode.off);
+      } catch (_) {}
+
+      if (!mounted) {
+        await c.dispose();
+        return;
+      }
 
       setState(() {
         _controller = c;
         _ready = true;
+        _flashOn = false;
+        _error = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _error = 'Camera not available: $e');
+      setState(() {
+        _error = 'Camera not available: $e';
+        _ready = false;
+        _flashOn = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Camera not available: $e')),
       );
+    }
+  }
+
+  Future<void> _toggleFlash() async {
+    final c = _controller;
+    if (!_ready || c == null || _stopping) {
+      setState(() => _error = 'Camera not ready.');
+      return;
+    }
+
+    try {
+      final next = !_flashOn;
+      await c.setFlashMode(next ? FlashMode.torch : FlashMode.off);
+      if (!mounted) return;
+      setState(() {
+        _flashOn = next;
+        _error = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _error = 'Flash is not available on this device.');
     }
   }
 
@@ -132,8 +192,13 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
         setState(() {
           _ready = false;
           _controller = null;
+          _flashOn = false;
         });
       }
+
+      try {
+        await c.setFlashMode(FlashMode.off);
+      } catch (_) {}
 
       try {
         await c.pausePreview();
@@ -150,6 +215,7 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
 
   @override
   void dispose() {
+    _scanTimer?.cancel();
     _stopCameraSafely();
     super.dispose();
   }
@@ -344,117 +410,155 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final s = MediaQuery.sizeOf(context).width / 390.0;
+    final canPreview = _ready && _controller != null && !_stopping;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          if (_ready && _controller != null && !_stopping)
-            Positioned.fill(child: CameraPreview(_controller!))
-          else
-            Positioned.fill(child: Container(color: Colors.black)),
+      backgroundColor: Colors.black,
+      body: SizedBox.expand(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned.fill(
+              child: canPreview
+                  ? _CameraPreviewCover(controller: _controller!)
+                  : const ColoredBox(color: Colors.black),
+            ),
 
-          SafeArea(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(12 * s, 4 * s, 12 * s, 0),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: _CarGuidelineOverlay(
+                  active: _active,
+                  phase: _scanPhase,
+                ),
+              ),
+            ),
+
+            Positioned(
+              top: 38 * s,
+              left: 16 * s,
+              right: 16 * s,
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.chevron_left_rounded,
-                      color: Colors.white,
-                      size: 32,
+                  Container(
+                    width: 48 * s,
+                    height: 48 * s,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(.35),
+                      shape: BoxShape.circle,
                     ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      _labelForPos(_active),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontFamily: 'ClashGrotesk',
-                        fontWeight: FontWeight.w800,
-                        fontSize: 20 * s,
+                    child: IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(
+                        Icons.chevron_left_rounded,
                         color: Colors.white,
-                        shadows: const [
-                          Shadow(color: Colors.black54, blurRadius: 8),
-                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 46),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        widget.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'ClashGrotesk',
+                          fontWeight: FontWeight.w800,
+                          fontSize: 20 * s,
+                          color: Colors.white,
+                          shadows: const [
+                            Shadow(color: Colors.black54, blurRadius: 8),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 48 * s,
+                    height: 48 * s,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(.35),
+                      shape: BoxShape.circle,
+                    ),
+                    child: _FlashButton(
+                      s: s,
+                      enabled: canPreview,
+                      isOn: _flashOn,
+                      onTap: _toggleFlash,
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
 
-          const ScanOverlay(),
-
-          if (_error != null)
-            Positioned(
-              top: 92,
-              left: 16 * s,
-              right: 16 * s,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(.85),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  _error!,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontFamily: 'ClashGrotesk',
-                    fontWeight: FontWeight.w700,
+            if (_error != null)
+              Positioned(
+                top: 92,
+                left: 16 * s,
+                right: 16 * s,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(.85),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'ClashGrotesk',
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
+
+            Positioned(
+              top: 86 * s,
+              left: 16 * s,
+              right: 16 * s,
+              child: _CaptureProgressCard(
+                s: s,
+                activeLabel: _labelForPos(_active),
+                captured: _capturedCount,
+                total: 8,
+              ),
             ),
 
-          Positioned(
-            top: 125,
-            left: 16 * s,
-            right: 16 * s,
-            child: Column(
-              children: [
-                _CaptureProgressCard(
-                  s: s,
-                  activeLabel: _labelForPos(_active),
-                  captured: _capturedCount,
-                  total: 8,
-                ),
-                SizedBox(height: 10 * s),
-                _CapturedThumbsGrid(
-                  s: s,
-                  active: _active,
-                  files: {
-                    TyrePos.frontLeft: _frontLeft,
-                    TyrePos.frontRight: _frontRight,
-                    TyrePos.backLeft: _backLeft,
-                    TyrePos.backRight: _backRight,
-                    TyrePos.frontLeftSidewall: _frontLeftSidewall,
-                    TyrePos.frontRightSidewall: _frontRightSidewall,
-                    TyrePos.backLeftSidewall: _backLeftSidewall,
-                    TyrePos.backRightSidewall: _backRightSidewall,
-                  },
-                  onSelect: (pos) => setState(() => _active = pos),
-                  onDelete: _retake,
-                ),
-              ],
+            Positioned(
+              top: 134 * s,
+              left: 16 * s,
+              right: 16 * s,
+              child: _CapturedThumbsGrid(
+                s: s,
+                active: _active,
+                files: {
+                  TyrePos.frontLeft: _frontLeft,
+                  TyrePos.frontRight: _frontRight,
+                  TyrePos.backLeft: _backLeft,
+                  TyrePos.backRight: _backRight,
+                  TyrePos.frontLeftSidewall: _frontLeftSidewall,
+                  TyrePos.frontRightSidewall: _frontRightSidewall,
+                  TyrePos.backLeftSidewall: _backLeftSidewall,
+                  TyrePos.backRightSidewall: _backRightSidewall,
+                },
+                onSelect: (pos) => setState(() => _active = pos),
+                onDelete: _retake,
+              ),
             ),
-          ),
 
-          Positioned(
-            left: 16 * s,
-            right: 16 * s,
-            bottom: 14 * s,
-            child: BottomActionBar(
-              enabled: _ready && !_stopping,
-              onPickGallery: _pickFromGallery,
-              onCapture: _capture,
+            Positioned(
+              left: 16 * s,
+              right: 16 * s,
+              bottom: 4 * s,
+              top:10,
+              child: BottomActionBar(
+                enabled: !_stopping,
+                onPickGallery: _pickFromGallery,
+                onCapture: _capture,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -492,6 +596,238 @@ class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
   }
 }
 
+class _FlashButton extends StatelessWidget {
+  const _FlashButton({
+    required this.s,
+    required this.enabled,
+    required this.isOn,
+    required this.onTap,
+  });
+
+  final double s;
+  final bool enabled;
+  final bool isOn;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: enabled ? 1 : .45,
+      child: GestureDetector(
+        onTap: enabled ? onTap : null,
+        child: Center(
+          child: Icon(
+            isOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
+            color: isOn ? const Color(0xFFFFD54F) : Colors.white,
+            size: 26 * s,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CarGuidelineOverlay extends StatelessWidget {
+  const _CarGuidelineOverlay({
+    required this.active,
+    required this.phase,
+  });
+
+  final TyrePos active;
+  final double phase;
+
+  bool get _isSidewall =>
+      active == TyrePos.frontLeftSidewall ||
+      active == TyrePos.frontRightSidewall ||
+      active == TyrePos.backLeftSidewall ||
+      active == TyrePos.backRightSidewall;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final h = constraints.maxHeight;
+
+        final frameWidth = w * .82;
+        final frameHeight = _isSidewall ? h * .34 : h * .46;
+        final left = (w - frameWidth) / 2;
+    final top = _isSidewall ? h * .34 : h * .37;
+        final rect = Rect.fromLTWH(left, top, frameWidth, frameHeight);
+
+        return CustomPaint(
+          size: Size(w, h),
+          painter: _CarFramePainter(
+            rect: rect,
+            phase: phase,
+            isSidewall: _isSidewall,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CarFramePainter extends CustomPainter {
+  const _CarFramePainter({
+    required this.rect,
+    required this.phase,
+    required this.isSidewall,
+  });
+
+  final Rect rect;
+  final double phase;
+  final bool isSidewall;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final overlay = Paint()..color = Colors.black.withOpacity(.06);
+    final frameRRect = RRect.fromRectAndRadius(rect, const Radius.circular(38));
+
+    final fullPath = Path()..addRect(Offset.zero & size);
+    final cutPath = Path()..addRRect(frameRRect);
+    final shaded = Path.combine(PathOperation.difference, fullPath, cutPath);
+    canvas.drawPath(shaded, overlay);
+
+    final cornerPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFF00C6FF), Color(0xFF7F53FD)],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ).createShader(rect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5.0
+      ..strokeCap = StrokeCap.round;
+
+    _drawCornerFrame(canvas, rect, cornerPaint);
+
+    final topPadding = 20.0;
+    final bottomPadding = 54.0;
+    final usableHeight = math.max(1.0, rect.height - topPadding - bottomPadding);
+    final progress = (phase % 90) / 90.0;
+    final y = rect.top + topPadding + (usableHeight * progress);
+
+    final lineRect = Rect.fromLTWH(rect.left, y - 12, rect.width, 24);
+
+    final scanPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFF00C6FF), Color(0xFF7F53FD)],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ).createShader(lineRect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.5
+      ..strokeCap = StrokeCap.round;
+
+    final glowPaint = Paint()
+      ..shader = const LinearGradient(
+        colors: [Color(0xFF00C6FF), Color(0xFF7F53FD)],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ).createShader(lineRect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 11
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    final start = Offset(rect.left + 52, y);
+    final end = Offset(rect.right - 52, y);
+    canvas.drawLine(start, end, glowPaint);
+    canvas.drawLine(start, end, scanPaint);
+  }
+
+  void _drawCornerFrame(Canvas canvas, Rect r, Paint p) {
+    final radius = math.min(38.0, math.min(r.width, r.height) / 4);
+    final cornerLen = math.min(96.0, math.min(r.width, r.height) * .32);
+
+    canvas.drawArc(
+      Rect.fromLTWH(r.left, r.top, radius * 2, radius * 2),
+      math.pi,
+      math.pi / 2,
+      false,
+      p,
+    );
+    canvas.drawLine(Offset(r.left + radius, r.top), Offset(r.left + cornerLen, r.top), p);
+    canvas.drawLine(Offset(r.left, r.top + radius), Offset(r.left, r.top + cornerLen), p);
+
+    canvas.drawArc(
+      Rect.fromLTWH(r.right - radius * 2, r.top, radius * 2, radius * 2),
+      -math.pi / 2,
+      math.pi / 2,
+      false,
+      p,
+    );
+    canvas.drawLine(Offset(r.right - radius, r.top), Offset(r.right - cornerLen, r.top), p);
+    canvas.drawLine(Offset(r.right, r.top + radius), Offset(r.right, r.top + cornerLen), p);
+
+    canvas.drawArc(
+      Rect.fromLTWH(r.left, r.bottom - radius * 2, radius * 2, radius * 2),
+      math.pi / 2,
+      math.pi / 2,
+      false,
+      p,
+    );
+    canvas.drawLine(Offset(r.left + radius, r.bottom), Offset(r.left + cornerLen, r.bottom), p);
+    canvas.drawLine(Offset(r.left, r.bottom - radius), Offset(r.left, r.bottom - cornerLen), p);
+
+    canvas.drawArc(
+      Rect.fromLTWH(r.right - radius * 2, r.bottom - radius * 2, radius * 2, radius * 2),
+      0,
+      math.pi / 2,
+      false,
+      p,
+    );
+    canvas.drawLine(Offset(r.right - radius, r.bottom), Offset(r.right - cornerLen, r.bottom), p);
+    canvas.drawLine(Offset(r.right, r.bottom - radius), Offset(r.right, r.bottom - cornerLen), p);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CarFramePainter oldDelegate) {
+    return oldDelegate.phase != phase ||
+        oldDelegate.rect != rect ||
+        oldDelegate.isSidewall != isSidewall;
+  }
+}
+
+class _CameraPreviewCover extends StatelessWidget {
+  const _CameraPreviewCover({required this.controller});
+
+  final CameraController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!controller.value.isInitialized) {
+      return const ColoredBox(color: Colors.black);
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenSize = Size(constraints.maxWidth, constraints.maxHeight);
+        final previewSize = controller.value.previewSize;
+
+        if (previewSize == null || screenSize.width <= 0 || screenSize.height <= 0) {
+          return const ColoredBox(color: Colors.black);
+        }
+
+        final screenRatio = screenSize.width / screenSize.height;
+        final previewRatio = previewSize.height / previewSize.width;
+        double scale = previewRatio / screenRatio;
+        if (scale < 1) scale = 1 / scale;
+
+        return ClipRect(
+          child: Transform.scale(
+            scale: scale,
+            alignment: Alignment.center,
+            child: Center(
+              child: CameraPreview(controller),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _CaptureProgressCard extends StatelessWidget {
   const _CaptureProgressCard({
     required this.s,
@@ -509,20 +845,23 @@ class _CaptureProgressCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(10 * s),
+      padding: EdgeInsets.symmetric(horizontal: 12 * s, vertical: 9 * s),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(.35),
-        borderRadius: BorderRadius.circular(14 * s),
-        border: Border.all(color: Colors.white.withOpacity(.10)),
+        color: Colors.black.withOpacity(.32),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(.12)),
       ),
       child: Text(
         'Capture $captured/$total • $activeLabel',
         textAlign: TextAlign.center,
         style: TextStyle(
           fontFamily: 'ClashGrotesk',
-          color: Colors.white,
+          color: Colors.white.withOpacity(.94),
           fontWeight: FontWeight.w900,
-          fontSize: 14 * s,
+          fontSize: 13 * s,
+          shadows: const [
+            Shadow(color: Colors.black87, blurRadius: 8),
+          ],
         ),
       ),
     );
@@ -670,3 +1009,666 @@ class _CapturedThumbsGrid extends StatelessWidget {
     );
   }
 }
+
+
+// enum TyrePos {
+//   frontLeft,
+//   frontRight,
+//   backLeft,
+//   backRight,
+//   frontLeftSidewall,
+//   frontRightSidewall,
+//   backLeftSidewall,
+//   backRightSidewall,
+// }
+
+// class CarTyresScannerScreen extends StatefulWidget {
+//   final String title;
+
+//   final String userId;
+//   final String vehicleId;
+//   final String token;
+//   final String vin;
+//   final String frontLeftTyreId;
+//   final String frontRightTyreId;
+//   final String backLeftTyreId;
+//   final String backRightTyreId;
+//   final String vehicleType;
+
+//   const CarTyresScannerScreen({
+//     super.key,
+//     this.title = "Car Tyre Scanner",
+//     required this.userId,
+//     required this.vehicleId,
+//     required this.token,
+//     required this.vin,
+//     required this.frontLeftTyreId,
+//     required this.frontRightTyreId,
+//     required this.backLeftTyreId,
+//     required this.backRightTyreId,
+//     this.vehicleType = "car",
+//   });
+
+//   @override
+//   State<CarTyresScannerScreen> createState() => _CarTyresScannerScreenState();
+// }
+
+// class _CarTyresScannerScreenState extends State<CarTyresScannerScreen> {
+//   CameraController? _controller;
+
+//   bool _ready = false;
+//   bool _stopping = false;
+
+//   XFile? _frontLeft;
+//   XFile? _frontRight;
+//   XFile? _backLeft;
+//   XFile? _backRight;
+//   XFile? _frontLeftSidewall;
+//   XFile? _frontRightSidewall;
+//   XFile? _backLeftSidewall;
+//   XFile? _backRightSidewall;
+
+//   TyrePos _active = TyrePos.frontLeft;
+//   String? _error;
+//   bool _navigated = false;
+//   final ImagePicker _picker = ImagePicker();
+
+//   bool get _allCaptured =>
+//       _frontLeft != null &&
+//       _frontRight != null &&
+//       _backLeft != null &&
+//       _backRight != null &&
+//       _frontLeftSidewall != null &&
+//       _frontRightSidewall != null &&
+//       _backLeftSidewall != null &&
+//       _backRightSidewall != null;
+
+//   @override
+//   void initState() {
+//     super.initState();
+//     _initCam();
+//   }
+
+//   Future<void> _initCam() async {
+//     try {
+//       final cams = await availableCameras();
+//       final back = cams.firstWhere(
+//         (c) => c.lensDirection == CameraLensDirection.back,
+//         orElse: () => cams.first,
+//       );
+
+//       final c = CameraController(
+//         back,
+//         ResolutionPreset.high,
+//         enableAudio: false,
+//       );
+
+//       await c.initialize();
+//       if (!mounted) return;
+
+//       setState(() {
+//         _controller = c;
+//         _ready = true;
+//       });
+//     } catch (e) {
+//       if (!mounted) return;
+//       setState(() => _error = 'Camera not available: $e');
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text('Camera not available: $e')),
+//       );
+//     }
+//   }
+
+//   Future<void> _stopCameraSafely() async {
+//     if (_stopping) return;
+//     _stopping = true;
+
+//     final c = _controller;
+//     if (c == null) {
+//       _stopping = false;
+//       return;
+//     }
+
+//     try {
+//       if (mounted) {
+//         setState(() {
+//           _ready = false;
+//           _controller = null;
+//         });
+//       }
+
+//       try {
+//         await c.pausePreview();
+//       } catch (_) {}
+
+//       await Future.delayed(const Duration(milliseconds: 80));
+//       await c.dispose();
+//     } catch (_) {
+//       // ignore
+//     } finally {
+//       _stopping = false;
+//     }
+//   }
+
+//   @override
+//   void dispose() {
+//     _stopCameraSafely();
+//     super.dispose();
+//   }
+
+//   XFile? _getFileForPos(TyrePos pos) {
+//     switch (pos) {
+//       case TyrePos.frontLeft:
+//         return _frontLeft;
+//       case TyrePos.frontRight:
+//         return _frontRight;
+//       case TyrePos.backLeft:
+//         return _backLeft;
+//       case TyrePos.backRight:
+//         return _backRight;
+//       case TyrePos.frontLeftSidewall:
+//         return _frontLeftSidewall;
+//       case TyrePos.frontRightSidewall:
+//         return _frontRightSidewall;
+//       case TyrePos.backLeftSidewall:
+//         return _backLeftSidewall;
+//       case TyrePos.backRightSidewall:
+//         return _backRightSidewall;
+//     }
+//   }
+
+//   void _setFileForActive(XFile file) {
+//     setState(() {
+//       _error = null;
+//       switch (_active) {
+//         case TyrePos.frontLeft:
+//           _frontLeft = file;
+//           _active = TyrePos.frontRight;
+//           break;
+//         case TyrePos.frontRight:
+//           _frontRight = file;
+//           _active = TyrePos.backLeft;
+//           break;
+//         case TyrePos.backLeft:
+//           _backLeft = file;
+//           _active = TyrePos.backRight;
+//           break;
+//         case TyrePos.backRight:
+//           _backRight = file;
+//           _active = TyrePos.frontLeftSidewall;
+//           break;
+//         case TyrePos.frontLeftSidewall:
+//           _frontLeftSidewall = file;
+//           _active = TyrePos.frontRightSidewall;
+//           break;
+//         case TyrePos.frontRightSidewall:
+//           _frontRightSidewall = file;
+//           _active = TyrePos.backLeftSidewall;
+//           break;
+//         case TyrePos.backLeftSidewall:
+//           _backLeftSidewall = file;
+//           _active = TyrePos.backRightSidewall;
+//           break;
+//         case TyrePos.backRightSidewall:
+//           _backRightSidewall = file;
+//           break;
+//       }
+//     });
+//   }
+
+//   Future<void> _capture() async {
+//     if (!_ready || _controller == null || _stopping) return;
+
+//     try {
+//       final shot = await _controller!.takePicture();
+//       if (!mounted) return;
+
+//       _setFileForActive(shot);
+
+//       if (_allCaptured) {
+//         await _goGenerateReport();
+//       }
+//     } catch (e) {
+//       if (!mounted) return;
+//       setState(() => _error = 'Capture failed: $e');
+//     }
+//   }
+
+//   Future<void> _pickFromGallery() async {
+//     if (_stopping) return;
+
+//     try {
+//       final picked = await _picker.pickImage(
+//         source: ImageSource.gallery,
+//         imageQuality: 95,
+//       );
+
+//       if (!mounted) return;
+//       if (picked == null) return;
+
+//       _setFileForActive(picked);
+
+//       if (_allCaptured) {
+//         await _goGenerateReport();
+//       }
+//     } catch (e) {
+//       if (!mounted) return;
+//       setState(() => _error = 'Gallery pick failed: $e');
+//     }
+//   }
+
+//   Future<void> _goGenerateReport() async {
+//     if (_navigated) return;
+//     _navigated = true;
+
+//     await _stopCameraSafely();
+//     if (!mounted) return;
+
+//     final result = await Navigator.of(context).push(
+//       MaterialPageRoute(
+//         builder: (_) => GenerateReportScreen(
+//           frontLeftPath: _frontLeft!.path,
+//           frontRightPath: _frontRight!.path,
+//           backLeftPath: _backLeft!.path,
+//           backRightPath: _backRight!.path,
+//           frontLeftSidewallPath: _frontLeftSidewall!.path,
+//           frontRightSidewallPath: _frontRightSidewall!.path,
+//           backLeftSidewallPath: _backLeftSidewall!.path,
+//           backRightSidewallPath: _backRightSidewall!.path,
+//           userId: widget.userId,
+//           vehicleId: widget.vehicleId,
+//           token: widget.token,
+//           vin: widget.vin,
+//           vehicleType: widget.vehicleType,
+//           frontLeftTyreId: widget.frontLeftTyreId,
+//           frontRightTyreId: widget.frontRightTyreId,
+//           backLeftTyreId: widget.backLeftTyreId,
+//           backRightTyreId: widget.backRightTyreId,
+//         ),
+//       ),
+//     );
+
+//     _navigated = false;
+
+//     if (mounted && result == 'retake') {
+//       setState(() {
+//         _frontLeft = null;
+//         _frontRight = null;
+//         _backLeft = null;
+//         _backRight = null;
+//         _frontLeftSidewall = null;
+//         _frontRightSidewall = null;
+//         _backLeftSidewall = null;
+//         _backRightSidewall = null;
+//         _active = TyrePos.frontLeft;
+//         _error = null;
+//       });
+//     }
+
+//     if (mounted) {
+//       await _initCam();
+//     }
+//   }
+
+//   void _retake(TyrePos pos) {
+//     setState(() {
+//       switch (pos) {
+//         case TyrePos.frontLeft:
+//           _frontLeft = null;
+//           break;
+//         case TyrePos.frontRight:
+//           _frontRight = null;
+//           break;
+//         case TyrePos.backLeft:
+//           _backLeft = null;
+//           break;
+//         case TyrePos.backRight:
+//           _backRight = null;
+//           break;
+//         case TyrePos.frontLeftSidewall:
+//           _frontLeftSidewall = null;
+//           break;
+//         case TyrePos.frontRightSidewall:
+//           _frontRightSidewall = null;
+//           break;
+//         case TyrePos.backLeftSidewall:
+//           _backLeftSidewall = null;
+//           break;
+//         case TyrePos.backRightSidewall:
+//           _backRightSidewall = null;
+//           break;
+//       }
+//       _active = pos;
+//       _error = null;
+//     });
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final s = MediaQuery.sizeOf(context).width / 390.0;
+
+//     return Scaffold(
+//       body: Stack(
+//         children: [
+//           if (_ready && _controller != null && !_stopping)
+//             Positioned.fill(child: CameraPreview(_controller!))
+//           else
+//             Positioned.fill(child: Container(color: Colors.black)),
+
+//           SafeArea(
+//             child: Padding(
+//               padding: EdgeInsets.fromLTRB(12 * s, 4 * s, 12 * s, 0),
+//               child: Row(
+//                 children: [
+//                   IconButton(
+//                     onPressed: () => Navigator.pop(context),
+//                     icon: const Icon(
+//                       Icons.chevron_left_rounded,
+//                       color: Colors.white,
+//                       size: 32,
+//                     ),
+//                   ),
+//                   Expanded(
+//                     child: Text(
+//                       _labelForPos(_active),
+//                       textAlign: TextAlign.center,
+//                       style: TextStyle(
+//                         fontFamily: 'ClashGrotesk',
+//                         fontWeight: FontWeight.w800,
+//                         fontSize: 20 * s,
+//                         color: Colors.white,
+//                         shadows: const [
+//                           Shadow(color: Colors.black54, blurRadius: 8),
+//                         ],
+//                       ),
+//                     ),
+//                   ),
+//                   const SizedBox(width: 46),
+//                 ],
+//               ),
+//             ),
+//           ),
+
+//           const ScanOverlay(),
+
+//           if (_error != null)
+//             Positioned(
+//               top: 92,
+//               left: 16 * s,
+//               right: 16 * s,
+//               child: Container(
+//                 padding: const EdgeInsets.all(10),
+//                 decoration: BoxDecoration(
+//                   color: Colors.red.withOpacity(.85),
+//                   borderRadius: BorderRadius.circular(12),
+//                 ),
+//                 child: Text(
+//                   _error!,
+//                   style: const TextStyle(
+//                     color: Colors.white,
+//                     fontFamily: 'ClashGrotesk',
+//                     fontWeight: FontWeight.w700,
+//                   ),
+//                 ),
+//               ),
+//             ),
+
+//           Positioned(
+//             top: 125,
+//             left: 16 * s,
+//             right: 16 * s,
+//             child: Column(
+//               children: [
+//                 _CaptureProgressCard(
+//                   s: s,
+//                   activeLabel: _labelForPos(_active),
+//                   captured: _capturedCount,
+//                   total: 8,
+//                 ),
+//                 SizedBox(height: 10 * s),
+//                 _CapturedThumbsGrid(
+//                   s: s,
+//                   active: _active,
+//                   files: {
+//                     TyrePos.frontLeft: _frontLeft,
+//                     TyrePos.frontRight: _frontRight,
+//                     TyrePos.backLeft: _backLeft,
+//                     TyrePos.backRight: _backRight,
+//                     TyrePos.frontLeftSidewall: _frontLeftSidewall,
+//                     TyrePos.frontRightSidewall: _frontRightSidewall,
+//                     TyrePos.backLeftSidewall: _backLeftSidewall,
+//                     TyrePos.backRightSidewall: _backRightSidewall,
+//                   },
+//                   onSelect: (pos) => setState(() => _active = pos),
+//                   onDelete: _retake,
+//                 ),
+//               ],
+//             ),
+//           ),
+
+//           Positioned(
+//             left: 16 * s,
+//             right: 16 * s,
+//             bottom: 14 * s,
+//             child: BottomActionBar(
+//               enabled: _ready && !_stopping,
+//               onPickGallery: _pickFromGallery,
+//               onCapture: _capture,
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   int get _capturedCount => [
+//         _frontLeft,
+//         _frontRight,
+//         _backLeft,
+//         _backRight,
+//         _frontLeftSidewall,
+//         _frontRightSidewall,
+//         _backLeftSidewall,
+//         _backRightSidewall,
+//       ].where((e) => e != null).length;
+
+//   String _labelForPos(TyrePos pos) {
+//     switch (pos) {
+//       case TyrePos.frontLeft:
+//         return "Front Left Tread";
+//       case TyrePos.frontRight:
+//         return "Front Right Tread";
+//       case TyrePos.backLeft:
+//         return "Back Left Tread";
+//       case TyrePos.backRight:
+//         return "Back Right Tread";
+//       case TyrePos.frontLeftSidewall:
+//         return "Front Left Sidewall";
+//       case TyrePos.frontRightSidewall:
+//         return "Front Right Sidewall";
+//       case TyrePos.backLeftSidewall:
+//         return "Back Left Sidewall";
+//       case TyrePos.backRightSidewall:
+//         return "Back Right Sidewall";
+//     }
+//   }
+// }
+
+// class _CaptureProgressCard extends StatelessWidget {
+//   const _CaptureProgressCard({
+//     required this.s,
+//     required this.activeLabel,
+//     required this.captured,
+//     required this.total,
+//   });
+
+//   final double s;
+//   final String activeLabel;
+//   final int captured;
+//   final int total;
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Container(
+//       width: double.infinity,
+//       padding: EdgeInsets.all(10 * s),
+//       decoration: BoxDecoration(
+//         color: Colors.black.withOpacity(.35),
+//         borderRadius: BorderRadius.circular(14 * s),
+//         border: Border.all(color: Colors.white.withOpacity(.10)),
+//       ),
+//       child: Text(
+//         'Capture $captured/$total • $activeLabel',
+//         textAlign: TextAlign.center,
+//         style: TextStyle(
+//           fontFamily: 'ClashGrotesk',
+//           color: Colors.white,
+//           fontWeight: FontWeight.w900,
+//           fontSize: 14 * s,
+//         ),
+//       ),
+//     );
+//   }
+// }
+
+// class _CapturedThumbsGrid extends StatelessWidget {
+//   const _CapturedThumbsGrid({
+//     required this.s,
+//     required this.active,
+//     required this.files,
+//     required this.onSelect,
+//     required this.onDelete,
+//   });
+
+//   final double s;
+//   final TyrePos active;
+//   final Map<TyrePos, XFile?> files;
+//   final ValueChanged<TyrePos> onSelect;
+//   final ValueChanged<TyrePos> onDelete;
+
+//   static const _grad = LinearGradient(
+//     colors: [Color(0xFF0ED2F7), Color(0xFF7F53FD)],
+//     begin: Alignment.centerLeft,
+//     end: Alignment.centerRight,
+//   );
+
+//   static const _items = <TyrePos, String>{
+//     TyrePos.frontLeft: 'FL',
+//     TyrePos.frontRight: 'FR',
+//     TyrePos.backLeft: 'BL',
+//     TyrePos.backRight: 'BR',
+//     TyrePos.frontLeftSidewall: 'FL-S',
+//     TyrePos.frontRightSidewall: 'FR-S',
+//     TyrePos.backLeftSidewall: 'BL-S',
+//     TyrePos.backRightSidewall: 'BR-S',
+//   };
+
+//   @override
+//   Widget build(BuildContext context) {
+//     final entries = _items.entries.toList();
+//     return Container(
+//       padding: EdgeInsets.all(10 * s),
+//       decoration: BoxDecoration(
+//         color: Colors.black.withOpacity(.35),
+//         borderRadius: BorderRadius.circular(14 * s),
+//         border: Border.all(color: Colors.white.withOpacity(.10)),
+//       ),
+//       child: GridView.builder(
+//         shrinkWrap: true,
+//         padding: EdgeInsets.zero,
+//         physics: const NeverScrollableScrollPhysics(),
+//         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+//           crossAxisCount: 4,
+//           crossAxisSpacing: 8 * s,
+//           mainAxisSpacing: 8 * s,
+//         ),
+//         itemCount: entries.length,
+//         itemBuilder: (_, i) => _thumb(entries[i].value, entries[i].key, files[entries[i].key]),
+//       ),
+//     );
+//   }
+
+//   Widget _thumb(String short, TyrePos pos, XFile? file) {
+//     final selected = active == pos;
+
+//     return InkWell(
+//       onTap: () => onSelect(pos),
+//       borderRadius: BorderRadius.circular(12),
+//       child: AnimatedContainer(
+//         duration: const Duration(milliseconds: 180),
+//         padding: EdgeInsets.all(2.2 * s),
+//         decoration: BoxDecoration(
+//           borderRadius: BorderRadius.circular(12),
+//           gradient: selected ? _grad : null,
+//           color: selected ? null : Colors.white.withOpacity(.08),
+//           border: Border.all(
+//             color: selected ? Colors.transparent : Colors.white.withOpacity(.12),
+//           ),
+//         ),
+//         child: ClipRRect(
+//           borderRadius: BorderRadius.circular(10),
+//           child: Stack(
+//             fit: StackFit.expand,
+//             children: [
+//               if (file != null)
+//                 Image.file(File(file.path), fit: BoxFit.cover)
+//               else
+//                 Container(
+//                   color: Colors.white.withOpacity(.08),
+//                   child: Center(
+//                     child: Text(
+//                       short,
+//                       style: TextStyle(
+//                         fontFamily: 'ClashGrotesk',
+//                         color: Colors.white.withOpacity(.9),
+//                         fontWeight: FontWeight.w800,
+//                         fontSize: 11.5 * s,
+//                       ),
+//                     ),
+//                   ),
+//                 ),
+//               Positioned(
+//                 left: 5 * s,
+//                 bottom: 5 * s,
+//                 child: Container(
+//                   padding: EdgeInsets.symmetric(horizontal: 6 * s, vertical: 3 * s),
+//                   decoration: BoxDecoration(
+//                     color: Colors.black.withOpacity(.55),
+//                     borderRadius: BorderRadius.circular(999),
+//                   ),
+//                   child: Text(
+//                     short,
+//                     style: TextStyle(
+//                       fontFamily: 'ClashGrotesk',
+//                       color: Colors.white,
+//                       fontWeight: FontWeight.w800,
+//                       fontSize: 9.5 * s,
+//                     ),
+//                   ),
+//                 ),
+//               ),
+//               if (file != null)
+//                 Positioned(
+//                   right: 4 * s,
+//                   top: 4 * s,
+//                   child: GestureDetector(
+//                     onTap: () => onDelete(pos),
+//                     child: Container(
+//                       width: 22 * s,
+//                       height: 22 * s,
+//                       decoration: BoxDecoration(
+//                         color: Colors.black.withOpacity(.55),
+//                         shape: BoxShape.circle,
+//                         border: Border.all(color: Colors.white.withOpacity(.12)),
+//                       ),
+//                       child: Icon(Icons.close_rounded, size: 15 * s, color: Colors.white),
+//                     ),
+//                   ),
+//                 ),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+//   }
+// }
