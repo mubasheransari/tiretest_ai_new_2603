@@ -18,28 +18,6 @@ import 'package:ios_tiretest_ai/Bloc/auth_state.dart';
 import 'package:ios_tiretest_ai/models/tyre_record.dart';
 
 
-
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:get_storage/get_storage.dart';
-import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
-import 'package:open_filex/open_filex.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:share_plus/share_plus.dart';
-import 'package:ios_tiretest_ai/Bloc/auth_bloc.dart';
-import 'package:ios_tiretest_ai/Bloc/auth_event.dart';
-import 'package:ios_tiretest_ai/Bloc/auth_state.dart';
-import 'package:ios_tiretest_ai/models/tyre_record.dart';
-
-
-
 enum _Filter { all, today, last7, thisMonth }
 enum _VehicleTab { all, car, bike }
 
