@@ -8,26 +8,7 @@ import 'package:ios_tiretest_ai/Screens/scanner_front_tire_screen.dart';
 import 'package:ios_tiretest_ai/Widgets/bottom_action_bar.dart' show BottomActionBar;
 import 'package:ios_tiretest_ai/Screens/two_wheeler_report_result_screen.dart';
 
-import 'dart:io';
-import 'dart:async';
-import 'dart:math' as math;
-import 'package:camera/camera.dart';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:ios_tiretest_ai/Screens/scanner_front_tire_screen.dart';
-import 'package:ios_tiretest_ai/Widgets/bottom_action_bar.dart' show BottomActionBar;
-import 'package:ios_tiretest_ai/Screens/two_wheeler_report_result_screen.dart';
 
-
-import 'dart:io';
-import 'dart:async';
-import 'dart:math' as math;
-
-import 'package:camera/camera.dart';
-import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:ios_tiretest_ai/Widgets/bottom_action_bar.dart' show BottomActionBar;
-import 'package:ios_tiretest_ai/Screens/two_wheeler_report_result_screen.dart';
 
 enum TwoTyrePos { front, frontSidewall, back, backSidewall }
 

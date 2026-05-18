@@ -377,6 +377,11 @@ class _AuthScreenState extends State<AuthScreen> {
     // ignore: avoid_print
     print("AUTH MESSAGE => $msg");
 
+        if (msg == "User not found") {
+     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Invalid credentials')));
+      return;
+    }
+
     if (msg == "Signup successful. OTP sent successfully!") {
       context.read<AuthBloc>().add(OtpIssuedNow(email: _signupEmailCtrl.text.trim()));
       Navigator.push(
@@ -389,19 +394,38 @@ class _AuthScreenState extends State<AuthScreen> {
     }
 
     if (msg == "Email not verified. Please verify OTP first.") {
-      context.read<AuthBloc>().add(OtpIssuedNow(email: _loginEmailCtrl.text.trim()));
-      context.read<AuthBloc>().add(
-        ForgotPasswordVerifyEmailRequested(email: _loginEmailCtrl.text.trim()),
-      );
+  context.read<AuthBloc>().add(OtpIssuedNow(email: _loginEmailCtrl.text.trim()));
+  context.read<AuthBloc>().add(
+    ForgotPasswordVerifyEmailRequested(
+      email: _loginEmailCtrl.text.trim(),
+    ),
+  );
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OtpVerificationScreen(targetText: _loginEmailCtrl.text.trim()),
-        ),
-      );
-      return;
-    }
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => OtpVerificationScreen(
+        targetText: _loginEmailCtrl.text.trim(),
+      ),
+    ),
+  );
+  return;
+}
+
+    // if (msg == "Email not verified. Please verify OTP first.") {
+    //   context.read<AuthBloc>().add(OtpIssuedNow(email: _loginEmailCtrl.text.trim()));
+    //   context.read<AuthBloc>().add(
+    //     ForgotPasswordVerifyEmailRequested(email: _loginEmailCtrl.text.trim()),
+    //   );
+
+    //   Navigator.push(
+    //     context,
+    //     MaterialPageRoute(
+    //       builder: (_) => OtpVerificationScreen(targetText: _loginEmailCtrl.text.trim()),
+    //     ),
+    //   );
+    //   return;
+    // }
   }
 
   // signup success (unchanged)
