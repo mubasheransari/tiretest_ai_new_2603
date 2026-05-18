@@ -1499,7 +1499,7 @@ class ApiConfig {
       'http://54.162.208.215/app/tyre/four_wheeler_upload/';
       
         static const String fetchUserRecord =
-      'http://54.162.208.215/app/tyre/fetch_user_record/';
+      'http://54.162.208.215/app/tyre/fetch_user_record/';//recordssss///
        static const String shopsUrl = 'http://54.162.208.215/backend/api/shops';
        static const String editProfile = "http://54.162.208.215/backend/api/userDetailsUpdate";
          static const String resetPassword =
